@@ -10,6 +10,7 @@
 #include <spark_wiring_i2c.h>
 
 // Status LEDs
+int ledBlue = D4;
 int ledGreen = D5;
 int ledRed = D6;
 
@@ -21,10 +22,14 @@ double humidity = 0;
 // Setup the program. it's run only once
 void setup() {
   // Init status LEDs
+  pinMode(ledBlue, OUTPUT);
   pinMode(ledRed, OUTPUT);
   pinMode(ledGreen, OUTPUT);
+  digitalWrite(ledBlue, LOW);
   digitalWrite(ledRed, LOW);
   digitalWrite(ledGreen, LOW);
+
+  bool setupError = false;
 
   // Declare Particle variables
   Particle.variable("temp", temp);
@@ -33,17 +38,23 @@ void setup() {
   // Init SHT31D
   int sht31Connection = sht31d.begin(0x44);
   if (sht31Connection != SHT31D_CC::NO_ERROR) {
-    digitalWrite(ledRed, HIGH);
+    setupError = true;
     Particle.publish("SHT31D-SETUP-ERROR", sht31Connection);
   }
   else{
     Particle.publish("SHT31D-SETUP", "Sensor connected");
   }
+
+  if(setupError){
+    digitalWrite(ledRed, HIGH);
+  }
+  else{
+    digitalWrite(ledGreen, HIGH);
+  }
 }
 
 void readSHT31(){
-  digitalWrite(ledGreen, HIGH);
-  digitalWrite(ledRed, LOW);
+  digitalWrite(ledBlue, HIGH);
   SHT31D_CC::SHT31D sht31Result = sht31d.readTempAndHumidity(SHT31D_CC::REPEATABILITY_LOW, SHT31D_CC::MODE_CLOCK_STRETCH, 50);
 
   if (sht31Result.error == SHT31D_CC::NO_ERROR) {
@@ -53,11 +64,11 @@ void readSHT31(){
     Particle.variable("humidity", humidity);
   }
   else{
-    Particle.publish("SHT31D-READ", sht31Result.error);    
+    Particle.publish("SHT31D-READ", sht31Result.error);
     digitalWrite(ledRed, HIGH);
   }
   delay(100);
-  digitalWrite(ledGreen, LOW);
+  digitalWrite(ledBlue, LOW);
 }
 
 void loop() {
