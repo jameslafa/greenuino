@@ -9,6 +9,7 @@
 #include <spark_wiring_i2c.h>
 #include <ClosedCube_SHT31D.h>
 #include <Adafruit_TSL2591.h>
+#include <DS18B20.h>
 
 // Status LEDs
 int ledBlue = D4;
@@ -26,6 +27,11 @@ int lightLux = 0;
 int lightInfraRed = 0;
 int lightFullSpectrum = 0;
 
+// Water temperature
+DS18B20 ds18b20(D3, true);
+int DS18B20_MAX_RETRY = 4;
+double waterTemperature = 0;
+
 // Setup the program. it's run only once
 void setup() {
   // Init status LEDs
@@ -39,11 +45,12 @@ void setup() {
   bool setupError = false;
 
   // Declare Particle variables
-  Particle.variable("temp", temperature);
-  Particle.variable("humidity", humidity);
+  Particle.variable("a_temp", temperature);
+  Particle.variable("a_humidity", humidity);
   Particle.variable("l_lux", lightLux);
   Particle.variable("l_inf_red", lightInfraRed);
   Particle.variable("l_full_spec", lightFullSpectrum);
+  Particle.variable("w_temp", waterTemperature);
 
   // Init SHT31D
   int sht31Connection = sht31d.begin(0x44);
@@ -86,8 +93,8 @@ void readSHT31(){
   if (sht31Result.error == SHT31D_CC::NO_ERROR) {
     temperature = sht31Result.t;
     humidity = sht31Result.rh;
-    Particle.variable("temperature", temperature);
-    Particle.variable("humidity", humidity);
+    Particle.variable("a_temp", temperature);
+    Particle.variable("a_humidity", humidity);
   }
   else{
     Particle.publish("reading/SHT31D/status", sht31Result.error);
@@ -109,16 +116,32 @@ void readTSL2591(){
   Particle.variable("l_full_spec", lightFullSpectrum);
 }
 
+// Read water temperature
+void readDS18B20(){
+  int readAttempt = 0;
+  float _temp;
+
+  do {
+    _temp = ds18b20.getTemperature();
+  } while (!ds18b20.crcCheck() && DS18B20_MAX_RETRY > readAttempt++);
+
+  if (readAttempt < DS18B20_MAX_RETRY){
+    waterTemperature = _temp;
+    Particle.variable("w_temp", waterTemperature);
+  }
+}
+
 // Read data from every sensors
 void readSensors(){
   digitalWrite(ledBlue, HIGH);
   readSHT31();
   readTSL2591();
+  readDS18B20();
   delay(100);
   digitalWrite(ledBlue, LOW);
 }
 
 void loop() {
   readSensors();
-  delay(5000);
+  delay(10000);
 }
